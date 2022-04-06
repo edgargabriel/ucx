@@ -135,7 +135,7 @@ ucs_status_t uct_rocm_ipc_ep_put_zcopy(uct_ep_h tl_ep, const uct_iov_t *iov, siz
     uct_rocm_ipc_key_t *key = (uct_rocm_ipc_key_t *)rkey;
 
     ret = uct_rocm_ipc_ep_zcopy(tl_ep, remote_addr, iov, key, comp, 1);
-
+    printf("[%d] uct_rocm_ipc_ep_put_zcopy\n", getpid());
     UCT_TL_EP_STAT_OP(ucs_derived_of(tl_ep, uct_base_ep_t), PUT, ZCOPY,
                       uct_iov_total_length(iov, iovcnt));
     uct_rocm_ipc_trace_data(remote_addr, rkey, "PUT_ZCOPY [length %zu]",
@@ -152,6 +152,7 @@ ucs_status_t uct_rocm_ipc_ep_get_zcopy(uct_ep_h tl_ep, const uct_iov_t *iov, siz
     uct_rocm_ipc_key_t *key = (uct_rocm_ipc_key_t *)rkey;
 
     ret = uct_rocm_ipc_ep_zcopy(tl_ep, remote_addr, iov, key, comp, 0);
+    printf("[%d] uct_rocm_ipc_ep_get_zcopy\n", getpid());
 
     UCT_TL_EP_STAT_OP(ucs_derived_of(tl_ep, uct_base_ep_t), GET, ZCOPY,
                       uct_iov_total_length(iov, iovcnt));

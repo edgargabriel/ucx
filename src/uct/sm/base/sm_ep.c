@@ -22,7 +22,8 @@ ucs_status_t uct_sm_ep_put_short(uct_ep_h tl_ep, const void *buffer,
                                  uct_rkey_t rkey)
 {
     if (ucs_likely(length != 0)) {
-        memcpy((void *)(rkey + remote_addr), buffer, length);
+      printf("uct_sm_ep_put_short: copy from %p to %p num_bytes %d\n", (void *)(rkey + remote_addr), buffer, length);
+      memcpy((void *)(rkey + remote_addr), buffer, length);
         uct_sm_ep_trace_data(remote_addr, rkey, "PUT_SHORT [buffer %p size %u]",
                              buffer, length);
     } else {
@@ -37,6 +38,7 @@ ssize_t uct_sm_ep_put_bcopy(uct_ep_h tl_ep, uct_pack_callback_t pack_cb,
 {
     size_t length;
 
+    printf("uct_sm_ep_put_bcopy: about to invoke pack_cb with dest %p arg %p\n", (void *)(rkey + remote_addr), arg );
     length = pack_cb((void *)(rkey + remote_addr), arg);
     uct_sm_ep_trace_data(remote_addr, rkey, "PUT_BCOPY [arg %p size %zu]",
     		             arg, length);
@@ -50,7 +52,8 @@ ucs_status_t uct_sm_ep_get_bcopy(uct_ep_h tl_ep, uct_unpack_callback_t unpack_cb
                                  uct_completion_t *comp)
 {
     if (ucs_likely(0 != length)) {
-        unpack_cb(arg, (void *)(rkey + remote_addr), length);
+      printf("uct_sm_ep_get_bcopy: about to invoke unpack_cb with dest %p len %ld\n", (void *)(rkey + remote_addr), length );
+	unpack_cb(arg, (void *)(rkey + remote_addr), length);
         uct_sm_ep_trace_data(remote_addr, rkey, "GET_BCOPY [length %zu]", length);
     } else {
         ucs_trace_data("GET_BCOPY [zero-length]");

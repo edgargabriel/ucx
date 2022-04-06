@@ -342,7 +342,7 @@ ssize_t uct_self_ep_am_bcopy(uct_ep_h tl_ep, uint8_t id,
 
     UCT_CHECK_LENGTH(length, 0, iface->send_size, "am_bcopy");
     UCT_TL_EP_STAT_OP(&ep->super, AM, BCOPY, length);
-
+    printf("uct_self_ep_am_bcopy: send_buffer %p arg %p length %ld \n", send_buffer, arg, length);
     uct_self_iface_sendrecv_am(iface, id, send_buffer, length, "BCOPY");
     return length;
 }

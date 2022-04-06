@@ -120,7 +120,7 @@ ucs_status_t uct_rocm_copy_ep_get_zcopy(uct_ep_h tl_ep, const uct_iov_t *iov, si
     } else {
         status = uct_rocm_copy_ep_zcopy(tl_ep, remote_addr, iov, rkey, 0);
     }
-
+    printf("[%d] uct_rocm_copy_ep_get_zcopy copying to %p from %p length %ld\n", getpid(), iov->buffer, (void *)remote_addr, size);
     UCT_TL_EP_STAT_OP(ucs_derived_of(tl_ep, uct_base_ep_t), GET, ZCOPY,
                       uct_iov_total_length(iov, iovcnt));
     uct_rocm_copy_trace_data(remote_addr, rkey, "GET_ZCOPY [length %zu]",
@@ -143,6 +143,7 @@ ucs_status_t uct_rocm_copy_ep_put_zcopy(uct_ep_h tl_ep, const uct_iov_t *iov, si
         status = uct_rocm_copy_ep_zcopy(tl_ep, remote_addr, iov, rkey, 1);
     }
 
+    printf("[%d] uct_rocm_copy_ep_put_zcopy copying to %p from %p length %ld\n", getpid(), (void *)remote_addr, iov->buffer, size);
     UCT_TL_EP_STAT_OP(ucs_derived_of(tl_ep, uct_base_ep_t), PUT, ZCOPY,
                       uct_iov_total_length(iov, iovcnt));
     uct_rocm_copy_trace_data(remote_addr, rkey, "GET_ZCOPY [length %zu]",
@@ -157,6 +158,7 @@ ucs_status_t uct_rocm_copy_ep_put_short(uct_ep_h tl_ep, const void *buffer,
 {
     uct_rocm_memcpy_h2d((void *)remote_addr, buffer, length);
 
+    printf("[%d] uct_rocm_copy_ep_put_short copying to %p from %p length %d\n", getpid(), (void *)remote_addr, buffer, length);
     UCT_TL_EP_STAT_OP(ucs_derived_of(tl_ep, uct_base_ep_t), PUT, SHORT, length);
     ucs_trace_data("PUT_SHORT size %d from %p to %p",
                    length, buffer, (void *)remote_addr);
@@ -168,7 +170,8 @@ ucs_status_t uct_rocm_copy_ep_get_short(uct_ep_h tl_ep, void *buffer,
                                         uct_rkey_t rkey)
 {
     uct_rocm_memcpy_d2h(buffer, (void *)remote_addr, length);
-
+    printf("[%d] uct_rocm_copy_ep_get_short copying to %p from %p length %d\n", getpid(), buffer, (void *)remote_addr, length);
+    
     UCT_TL_EP_STAT_OP(ucs_derived_of(tl_ep, uct_base_ep_t), GET, SHORT, length);
     ucs_trace_data("GET_SHORT size %d from %p to %p",
                    length, (void *)remote_addr, buffer);

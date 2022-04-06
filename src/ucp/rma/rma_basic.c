@@ -85,6 +85,8 @@ static ucs_status_t ucp_rma_basic_progress_get(uct_pending_req_t *self)
 
     if (ucs_likely((ssize_t)req->send.length < rma_config->get_zcopy_thresh)) {
         frag_length = ucs_min(rma_config->max_get_bcopy, req->send.length);
+	printf("[%d] ucp_rma_basic_progress_get: about to call uct_ep_get_bcopy send_buf %p remote_addr %p length %ld\n", getpid(),
+	       (void*)req->send.buffer, (void*)req->send.rma.remote_addr, frag_length);
         status = UCS_PROFILE_CALL(uct_ep_get_bcopy,
                                   ep->uct_eps[lane],
                                   (uct_unpack_callback_t)memcpy,

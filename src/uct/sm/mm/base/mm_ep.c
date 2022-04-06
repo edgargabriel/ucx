@@ -321,12 +321,12 @@ retry:
         if (ucs_unlikely(status != UCS_OK)) {
             return status;
         }
-
+	
         desc_data    = UCS_PTR_BYTE_OFFSET(base_address, elem->desc.offset);
         length       = pack_cb(desc_data, arg);
         elem_flags   = 0;
         elem->length = length;
-
+	printf("[%d] uct_mm_ep_am_common_send: desc_data = %p arg=%p length=%ld\n", getpid(), desc_data, arg, length);
         uct_mm_iface_trace_am(iface, UCT_AM_TRACE_TYPE_SEND, elem_flags, am_id,
                               desc_data, elem->length,
                               head & ~UCT_MM_IFACE_FIFO_HEAD_EVENT_ARMED);
@@ -412,7 +412,7 @@ ssize_t uct_mm_ep_am_bcopy(uct_ep_h tl_ep, uint8_t id, uct_pack_callback_t pack_
 {
     uct_mm_iface_t *iface = ucs_derived_of(tl_ep->iface, uct_mm_iface_t);
     uct_mm_ep_t *ep = ucs_derived_of(tl_ep, uct_mm_ep_t);
-
+    printf("[%d] uct_mm_ep_am_bcopy\n", getpid());
     return uct_mm_ep_am_common_send(UCT_MM_SEND_AM_BCOPY, ep, iface, id, 0, 0,
                                     NULL, pack_cb, arg, NULL, 0, flags);
 }

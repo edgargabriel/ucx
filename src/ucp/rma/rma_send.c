@@ -144,10 +144,10 @@ ucp_rma_request_init(ucp_request_t *req, ucp_ep_h ep, const void *buffer,
 #if UCS_ENABLE_ASSERT
     req->send.cb              = NULL;
 #endif
+    printf("[%d] ucp_rma_request_init: length %ld zcopy_thresh %ld\n", getpid(), length, zcopy_thresh);
     if (length < zcopy_thresh) {
         return UCS_OK;
     }
-
     return ucp_request_send_buffer_reg_lane(req, req->send.lane, 0);
 }
 
@@ -281,10 +281,11 @@ ucs_status_ptr_t ucp_put_nbx(ucp_ep_h ep, const void *buffer, size_t count,
             ret = UCS_STATUS_PTR(status);
             goto out_unlock;
         }
-
+	printf("[%d] ucp_put_nbx count %d max_put_short %d\n", getpid(), (int)count, (int)rkey->cache.max_put_short);
         /* Fast path for a single short message */
         if (ucs_likely(!(attr_mask & UCP_OP_ATTR_FLAG_NO_IMM_CMPL) &&
                        ((ssize_t)count <= rkey->cache.max_put_short))) {
+	  printf("[%d] ucp_put_nbx about to call uct_ep_put_short\n", getpid());
             status = UCS_PROFILE_CALL(uct_ep_put_short,
                                       ep->uct_eps[rkey->cache.rma_lane], buffer,
                                       count, remote_addr, rkey->cache.rma_rkey);
@@ -300,6 +301,7 @@ ucs_status_ptr_t ucp_put_nbx(ucp_ep_h ep, const void *buffer, size_t count,
         }
 
         rma_config = &ucp_ep_config(ep)->rma[rkey->cache.rma_lane];
+	printf("[%d] ucp_put_nbx about to call ucp_rma_nonblocking put_zcopy_thresh %ld\n", getpid(), rma_config->put_zcopy_thresh);
         ret = ucp_rma_nonblocking(ep, buffer, count, remote_addr, rkey,
                                   UCP_RKEY_RMA_PROTO(rkey->cache.rma_proto_index)->progress_put,
                                   rma_config->put_zcopy_thresh, param);

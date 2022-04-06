@@ -34,7 +34,8 @@ static size_t ucp_rma_sw_put_pack_cb(void *dest, void *arg)
     length = ucs_min(req->send.length,
                      ucp_ep_config(ep)->am.max_bcopy - sizeof(*puth));
     memcpy(puth + 1, req->send.buffer, length);
-
+    printf("[%d]: ucp_rma_sw_put_pack_cb: copy to %p from %p num bytes %ld\n", getpid(), puth + 1, req->send.buffer, length);
+    
     return sizeof(*puth) + length;
 }
 
@@ -43,8 +44,9 @@ static ucs_status_t ucp_rma_sw_progress_put(uct_pending_req_t *self)
     ucp_request_t *req = ucs_container_of(self, ucp_request_t, send.uct);
     ssize_t packed_len = 0;
     ucs_status_t status;
-
+    
     req->send.lane = ucp_ep_get_am_lane(req->send.ep);
+    printf("[%d]: ucp_rma_sw_progress_put: send.lane = %d\n", getpid(), req->send.lane);
     status         = ucp_rma_sw_do_am_bcopy(req, UCP_AM_ID_PUT, req->send.lane,
                                             ucp_rma_sw_put_pack_cb, req,
                                             &packed_len);
@@ -75,7 +77,7 @@ static ucs_status_t ucp_rma_sw_progress_get(uct_pending_req_t *self)
 
     req->send.lane = ucp_ep_get_am_lane(req->send.ep);
     ucp_send_request_id_alloc(req);
-
+    printf("[%d] ucp_rma_sw_progress_get: send.lane = %d\n", getpid(), req->send.lane);
     status = ucp_rma_sw_do_am_bcopy(req, UCP_AM_ID_GET_REQ, req->send.lane,
                                     ucp_rma_sw_get_req_pack_cb, req,
                                     &packed_len);
@@ -272,6 +274,7 @@ UCS_PROFILE_FUNC(ucs_status_t, ucp_get_rep_handler, (arg, data, length, am_flags
                                "GET reply data %p", getreph);
     ep = req->send.ep;
     if (ep->worker->context->config.ext.proto_enable) {
+	printf("[%d] ucp_get_rep_handler: calling ucp_datatype_iter_unpack  length %ld\n", getpid(), frag_length);
         ucp_datatype_iter_unpack(&req->send.state.dt_iter, worker, frag_length,
                                  getreph->offset, getreph + 1);
         req->send.state.completed_size += frag_length;
@@ -282,7 +285,7 @@ UCS_PROFILE_FUNC(ucs_status_t, ucp_get_rep_handler, (arg, data, length, am_flags
         }
     } else {
         memcpy(req->send.buffer, getreph + 1, frag_length);
-
+	printf("[%d] ucp_get_rep_handler: copying to %p from %p length %ld\n", getpid(), req->send.buffer, getreph + 1, frag_length);
         /* complete get request on last fragment of the reply */
         if (ucp_rma_request_advance(req, frag_length, UCS_OK,
                                     getreph->req_id) == UCS_OK) {
