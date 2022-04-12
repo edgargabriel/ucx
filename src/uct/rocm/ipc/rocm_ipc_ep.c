@@ -160,3 +160,40 @@ ucs_status_t uct_rocm_ipc_ep_get_zcopy(uct_ep_h tl_ep, const uct_iov_t *iov, siz
 
     return ret;
 }
+
+ucs_status_t uct_rocm_ipc_ep_put_short(uct_ep_h tl_ep, const void *buffer,
+                                        unsigned length, uint64_t remote_addr,
+                                        uct_rkey_t rkey)
+{
+    uct_iov_t iov;
+    ucs_status_t ret;
+    uct_rocm_ipc_key_t *key = (uct_rocm_ipc_key_t *)rkey;
+
+    iov.buffer = (void *)buffer;
+    iov.length = length;
+    iov.count  = 1;
+    ret = uct_rocm_ipc_ep_zcopy(tl_ep, remote_addr, &iov, key, NULL, 1);
+
+
+    UCT_TL_EP_STAT_OP(ucs_derived_of(tl_ep, uct_base_ep_t), PUT, SHORT, length);
+    uct_rocm_ipc_trace_data(remote_addr, rkey, "PUT_SHORT [length %u]", length);
+    return ret;
+}
+
+ucs_status_t uct_rocm_ipc_ep_get_short(uct_ep_h tl_ep, void *buffer,
+                                        unsigned length, uint64_t remote_addr,
+                                        uct_rkey_t rkey)
+{
+    uct_iov_t iov;
+    ucs_status_t ret;
+    uct_rocm_ipc_key_t *key = (uct_rocm_ipc_key_t *)rkey;
+
+    iov.buffer = buffer;
+    iov.length = length;
+    iov.count  = 1;
+    ret = uct_rocm_ipc_ep_zcopy(tl_ep, remote_addr, &iov, key, NULL, 0);
+
+    UCT_TL_EP_STAT_OP(ucs_derived_of(tl_ep, uct_base_ep_t), GET, SHORT, length);
+    uct_rocm_ipc_trace_data(remote_addr, rkey, "GET_SHORT [length %u]", length);
+    return ret;
+}

@@ -76,12 +76,14 @@ static ucs_status_t uct_rocm_ipc_iface_query(uct_iface_h tl_iface,
 
     uct_base_iface_query(&iface->super, iface_attr);
 
+    iface_attr->cap.put.max_short       = UINT_MAX;
     iface_attr->cap.put.min_zcopy       = 0;
     iface_attr->cap.put.max_zcopy       = SIZE_MAX;
     iface_attr->cap.put.opt_zcopy_align = sizeof(uint32_t);
     iface_attr->cap.put.align_mtu       = iface_attr->cap.put.opt_zcopy_align;
     iface_attr->cap.put.max_iov         = 1;
 
+    iface_attr->cap.get.max_short       = UINT_MAX;
     iface_attr->cap.get.min_zcopy       = 0;
     iface_attr->cap.get.max_zcopy       = SIZE_MAX;
     iface_attr->cap.get.opt_zcopy_align = sizeof(uint32_t);
@@ -92,10 +94,12 @@ static ucs_status_t uct_rocm_ipc_iface_query(uct_iface_h tl_iface,
     iface_attr->device_addr_len         = sizeof(uint64_t);
     iface_attr->ep_addr_len             = 0;
     iface_attr->max_conn_priv           = 0;
-    iface_attr->cap.flags               = UCT_IFACE_FLAG_GET_ZCOPY |
+    iface_attr->cap.flags               = UCT_IFACE_FLAG_CONNECT_TO_IFACE |
+                                          UCT_IFACE_FLAG_GET_SHORT |
+                                          UCT_IFACE_FLAG_PUT_SHORT |
+					  UCT_IFACE_FLAG_GET_ZCOPY |
                                           UCT_IFACE_FLAG_PUT_ZCOPY |
-                                          UCT_IFACE_FLAG_PENDING   |
-                                          UCT_IFACE_FLAG_CONNECT_TO_IFACE;
+                                          UCT_IFACE_FLAG_PENDING;
 
     iface_attr->latency                 = ucs_linear_func_make(1e-9, 0);
     iface_attr->bandwidth.dedicated     = 0;
@@ -158,6 +162,8 @@ static unsigned uct_rocm_ipc_iface_progress(uct_iface_h tl_iface)
 }
 
 static uct_iface_ops_t uct_rocm_ipc_iface_ops = {
+    .ep_get_short             = uct_rocm_ipc_ep_get_short,
+    .ep_put_short             = uct_rocm_ipc_ep_put_short,
     .ep_put_zcopy             = uct_rocm_ipc_ep_put_zcopy,
     .ep_get_zcopy             = uct_rocm_ipc_ep_get_zcopy,
     .ep_pending_add           = ucs_empty_function_return_busy,
