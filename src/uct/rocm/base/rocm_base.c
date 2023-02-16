@@ -1,5 +1,5 @@
 /*
- * Copyright (C) Advanced Micro Devices, Inc. 2019. ALL RIGHTS RESERVED.
+ * Copyright (C) Advanced Micro Devices, Inc. 2019-2023. ALL RIGHTS RESERVED.
  * See file LICENSE for terms.
  */
 
@@ -217,10 +217,46 @@ ucs_status_t uct_rocm_base_detect_memory_type(uct_md_h md, const void *addr,
     return UCS_OK;
 }
 
+int uct_rocm_base_is_dmabuf_supported()
+{
+    int dmabuf_supported = 0;
+
+#if HAVE_HSA_AMD_PORTABLE_EXPORT_DMABUF == 1
+    dmabuf_supported = 1;
+#endif
+
+    return dmabuf_supported;
+}
+
+static void uct_rocm_base_dmabuf_export (const void *addr, const size_t length,
+                                         ucs_memory_type_t  mem_type,
+					 int *dmabuf_fd, size_t *dmabuf_offset)
+{
+    int fd          = UCT_DMABUF_FD_INVALID;
+    uint64_t offset = 0;
+#if HAVE_HSA_AMD_PORTABLE_EXPORT_DMABUF == 1
+    hsa_status_t status;
+
+    if (mem_type == UCS_MEMORY_TYPE_ROCM) {
+        status = hsa_amd_portable_export_dmabuf(addr, length, &fd, &offset);
+        if (status != HSA_STATUS_SUCCESS) {
+            fd     = UCT_DMABUF_FD_INVALID;
+            offset = 0;
+            ucs_warn("failed to export dmabuf handle for addr %p / %lu", addr, length);
+        }
+        printf("uct_rocm_base_dmabuf_export addr %p %lu to dmabuf fd %d offset %lu\n", addr, length, fd, offset);
+    }
+#endif
+    *dmabuf_fd     = fd;
+    *dmabuf_offset = (size_t) offset;
+}
+
 ucs_status_t uct_rocm_base_mem_query(uct_md_h md, const void *addr,
                                      const size_t length,
                                      uct_md_mem_attr_t *mem_attr_p)
 {
+    size_t dmabuf_offset = 0;
+    int dmabuf_fd;
     ucs_status_t status;
     ucs_memory_type_t mem_type;
 
@@ -246,11 +282,12 @@ ucs_status_t uct_rocm_base_mem_query(uct_md_h md, const void *addr,
     }
 
     if (mem_attr_p->field_mask & UCT_MD_MEM_ATTR_FIELD_DMABUF_FD) {
-        mem_attr_p->dmabuf_fd = UCT_DMABUF_FD_INVALID;
+        uct_rocm_base_dmabuf_export (addr, length, mem_type, &dmabuf_fd, &dmabuf_offset);
+        mem_attr_p->dmabuf_fd = dmabuf_fd;
     }
 
     if (mem_attr_p->field_mask & UCT_MD_MEM_ATTR_FIELD_DMABUF_OFFSET) {
-        mem_attr_p->dmabuf_offset = 0;
+        mem_attr_p->dmabuf_offset = dmabuf_offset;
     }
 
     return UCS_OK;
