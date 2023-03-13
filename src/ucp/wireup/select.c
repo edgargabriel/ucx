@@ -2183,6 +2183,9 @@ ucp_wireup_construct_lanes(const ucp_wireup_select_params_t *select_params,
     ucp_lane_index_t lane;
     ucp_lane_index_t i;
 
+    pid_t mypid = getpid();
+    int ii, jj;
+
     key->num_lanes = select_ctx->num_lanes;
     /* Construct the endpoint configuration key:
      * - arrange lane description in the EP configuration
@@ -2301,6 +2304,46 @@ ucp_wireup_construct_lanes(const ucp_wireup_select_params_t *select_params,
     /* use AM lane first for eager AM transport to simplify processing single/middle
      * msg packets */
     key->am_bw_lanes[0] = key->am_lane;
+
+    printf("[%d] ep %p ucp_wireup_construct_lanes rma_lanes\n", mypid, ep);
+    for (ii=0; ii< key->num_lanes; ii++) {
+      if ( key->rma_lanes[ii] == UCP_NULL_LANE) continue;
+      jj = key->rma_lanes[ii];
+      printf("    [%d] lane %d / %d rsc_index %d %s dst_sys_dev %d dst_md_index %d lane_type %d score %f\n", mypid, ii, jj,
+	     key->lanes[jj].rsc_index, context->tl_rscs[key->lanes[jj].rsc_index].tl_rsc.tl_name,
+	     key->lanes[jj].dst_sys_dev, key->lanes[jj].dst_md_index, key->lanes[jj].lane_types,
+	     select_ctx->lane_descs[jj].score[UCP_LANE_TYPE_RMA]);
+    }
+
+    printf("[%d] ep %p ucp_wireup_construct_lanes rma_bw_lanes\n", mypid, ep);
+    for (ii=0; ii < key->num_lanes; ii++) {
+      if ( key->rma_bw_lanes[ii] == UCP_NULL_LANE) continue;
+      jj = key->rma_bw_lanes[ii];
+      printf("    [%d] lane %d / %d rsc_index %d %s dst_sys_dev %d dst_md_index %d lane_type %d score %f\n", mypid, ii, jj,
+	     key->lanes[jj].rsc_index, context->tl_rscs[key->lanes[jj].rsc_index].tl_rsc.tl_name,
+	     key->lanes[jj].dst_sys_dev, key->lanes[jj].dst_md_index, key->lanes[jj].lane_types,
+	     select_ctx->lane_descs[jj].score[UCP_LANE_TYPE_RMA_BW]);
+    }
+
+    printf("[%d] ep %p ucp_wireup_construct_lanes am_bw_lanes\n", mypid, ep);
+    for (ii=0; ii < key->num_lanes; ii++) {
+      if ( key->am_bw_lanes[ii] == UCP_NULL_LANE) continue;
+      jj = key->am_bw_lanes[ii];
+      printf("    [%d] lane %d / %d rsc_index %d %s dst_sys_dev %d dst_md_index %d lane_type %d score %f\n", mypid, ii, jj,
+	     key->lanes[jj].rsc_index, context->tl_rscs[key->lanes[jj].rsc_index].tl_rsc.tl_name,
+	     key->lanes[jj].dst_sys_dev, key->lanes[jj].dst_md_index, key->lanes[jj].lane_types,
+	     select_ctx->lane_descs[jj].score[UCP_LANE_TYPE_AM_BW]);
+    }
+
+    printf("[%d] ep %p ucp_wireup_construct_lanes amo_lanes\n", mypid, ep);
+    for (ii=0; ii < key->num_lanes; ii++) {
+      if ( key->amo_lanes[ii] == UCP_NULL_LANE) continue;
+      jj = key->amo_lanes[ii];
+      printf("    [%d] lane %d / %d rsc_index %d %s dst_sys_dev %d dst_md_index %d lane_type %d score %f\n", mypid, ii, jj,
+	     key->lanes[jj].rsc_index, context->tl_rscs[key->lanes[jj].rsc_index].tl_rsc.tl_name,
+	     key->lanes[jj].dst_sys_dev, key->lanes[jj].dst_md_index, key->lanes[jj].lane_types,
+	     select_ctx->lane_descs[jj].score[UCP_LANE_TYPE_AMO]);
+    }
 
     return ucp_wireup_select_set_locality_flags(select_params, key);
 }
