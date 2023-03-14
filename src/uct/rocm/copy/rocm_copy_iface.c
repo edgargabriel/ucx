@@ -208,7 +208,7 @@ uct_rocm_copy_estimate_perf(uct_iface_h tl_iface, uct_perf_attr_t *perf_attr)
     }
 
     if (perf_attr->field_mask & UCT_PERF_ATTR_FIELD_LATENCY) {
-        perf_attr->latency = ucs_linear_func_make(10e-6, 0);
+        perf_attr->latency = ucs_linear_func_make(1.5e-7, 0);
     }
 
     if (perf_attr->field_mask & UCT_PERF_ATTR_FIELD_MAX_INFLIGHT_EPS) {
