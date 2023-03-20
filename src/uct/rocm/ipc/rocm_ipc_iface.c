@@ -161,6 +161,8 @@ static UCS_CLASS_INIT_FUNC(uct_rocm_ipc_iface_t, uct_md_h md, uct_worker_h worke
 {
     ucs_status_t status;
     ucs_mpool_params_t mp_params;
+    char target_name[64];
+    pid_t iface_pid;
 
     UCS_CLASS_CALL_SUPER_INIT(uct_base_iface_t, &uct_rocm_ipc_iface_ops, 
                               &uct_base_iface_internal_ops,
@@ -182,6 +184,15 @@ static UCS_CLASS_INIT_FUNC(uct_rocm_ipc_iface_t, uct_md_h md, uct_worker_h worke
 
     ucs_queue_head_init(&self->signal_queue);
 
+    iface_pid = getpid();
+    snprintf(target_name, sizeof(target_name), "dest:%d", iface_pid);
+    status = uct_rocm_ipc_create_cache(&self->remote_memh_cache, target_name);
+    if (status != UCS_OK) {
+        ucs_error("could not create create rocm ipc cache: %s",
+                  ucs_status_string(status));
+        return status;
+    }
+
     return UCS_OK;
 }
 
@@ -191,6 +202,7 @@ static UCS_CLASS_CLEANUP_FUNC(uct_rocm_ipc_iface_t)
     uct_base_iface_progress_disable(&self->super.super,
                                     UCT_PROGRESS_SEND | UCT_PROGRESS_RECV);
     ucs_mpool_cleanup(&self->signal_pool, 1);
+    uct_rocm_ipc_destroy_cache(self->remote_memh_cache);
 }
 
 UCS_CLASS_DEFINE(uct_rocm_ipc_iface_t, uct_base_iface_t);
