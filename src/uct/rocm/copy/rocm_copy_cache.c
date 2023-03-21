@@ -98,23 +98,42 @@ static void uct_rocm_copy_cache_invalidate_regions(uct_rocm_copy_cache_t *cache,
               to);
 }
 
+static void uct_rocm_copy_pg_align_addr(void **address, size_t *length)
+{
+    void *start, *end;
+    size_t page_size;
+
+    page_size = ucs_get_page_size();
+    start     = ucs_align_down_pow2_ptr(*address, page_size);
+    end       = ucs_align_up_pow2_ptr(UCS_PTR_BYTE_OFFSET(*address, *length), page_size);
+    ucs_assert_always(start <= end);
+
+    *address  = start;
+    *length   = UCS_PTR_BYTE_DIFF(start, end);
+}
+
 ucs_status_t uct_rocm_copy_cache_map_memhandle(void *arg, const uint64_t addr,
                                                size_t length,
                                                void **mapped_addr)
 {
     uct_rocm_copy_cache_t *cache = (uct_rocm_copy_cache_t*)arg;
+    void *base_ptr = (void*)addr;
+    size_t base_length = length;
     ucs_status_t status;
     ucs_pgt_region_t *pgt_region;
     uct_rocm_copy_cache_region_t *region;
     hsa_status_t hsa_status;
     int ret;
+    size_t offset;
 
     pthread_rwlock_rdlock(&cache->lock);
+    uct_rocm_copy_pg_align_addr(&base_ptr, &base_length);
+    offset = (uintptr_t)addr - (uintptr_t)base_ptr;
     pgt_region = UCS_PROFILE_CALL(ucs_pgtable_lookup, &cache->pgtable, addr);
     if (pgt_region != NULL) {
         region = ucs_derived_of(pgt_region, uct_rocm_copy_cache_region_t);
         if ((region->base_ptr == addr)  && (region->base_length == length)) {
-            *mapped_addr = region->mapped_addr;
+            *mapped_addr = region->mapped_addr + offset;
             pthread_rwlock_unlock(&cache->lock);
             return UCS_OK;
         }
@@ -131,10 +150,10 @@ ucs_status_t uct_rocm_copy_cache_map_memhandle(void *arg, const uint64_t addr,
         goto err;
     }
 
-    region->super.start = ucs_align_down_pow2(addr, UCS_PGT_ADDR_ALIGN);
-    region->super.end   = ucs_align_up_pow2(addr + length, UCS_PGT_ADDR_ALIGN);
+    region->super.start = (ucs_pgt_addr_t)base_ptr;
+    region->super.end   = (ucs_pgt_addr_t)(base_ptr + base_length);
 
-    hsa_status = hsa_amd_memory_lock((void*)addr, length, NULL, 0, mapped_addr);
+    hsa_status = hsa_amd_memory_lock((void*)base_ptr, base_length, NULL, 0, mapped_addr);
     if (ucs_unlikely(hsa_status != HSA_STATUS_SUCCESS)) {
         pthread_rwlock_unlock(&cache->lock);
         ucs_fatal("%s: failed to lock mem address: %p len:%lu", cache->name,
@@ -143,6 +162,7 @@ ucs_status_t uct_rocm_copy_cache_map_memhandle(void *arg, const uint64_t addr,
     region->mapped_addr = *mapped_addr;
     region->base_ptr    = addr;
     region->base_length = length;
+    *mapped_addr += offset;
 
     status = UCS_PROFILE_CALL(ucs_pgtable_insert,
                               &cache->pgtable, &region->super);
