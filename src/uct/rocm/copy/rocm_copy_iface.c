@@ -37,6 +37,56 @@ static ucs_config_field_t uct_rocm_copy_iface_config_table[] = {
      ucs_offsetof(uct_rocm_copy_iface_config_t, enable_async_zcopy),
      UCS_CONFIG_TYPE_BOOL},
 
+    {"BW", "6911.0MB/s",
+     "Bandwidth",
+     ucs_offsetof(uct_rocm_copy_iface_config_t, bandwidth),
+     UCS_CONFIG_TYPE_BW},
+
+    {"DBW", "6911.0MB/s",
+     "Dedicated Bandwidth",
+     ucs_offsetof(uct_rocm_copy_iface_config_t, dedicated_bandwidth),
+     UCS_CONFIG_TYPE_BW},
+
+    {"PUT_SHORT_BW", "10500.0MB/s",
+     "Put-short bandwidth",
+     ucs_offsetof(uct_rocm_copy_iface_config_t, put_short_bandwidth),
+     UCS_CONFIG_TYPE_BW},
+
+    {"GET_SHORT_BW", "2000.0MB/s",
+     "Get-short bandwidth",
+     ucs_offsetof(uct_rocm_copy_iface_config_t, get_short_bandwidth),
+     UCS_CONFIG_TYPE_BW},
+
+    {"PUT_ZCOPY_BW", "9500.0MB/s",
+     "Put-zcopy bandwidth",
+     ucs_offsetof(uct_rocm_copy_iface_config_t, put_zcopy_bandwidth),
+     UCS_CONFIG_TYPE_BW},
+
+    {"GET_ZCOPY_BW", "8000.0MB/s",
+     "Get-zcopy bandwidth",
+     ucs_offsetof(uct_rocm_copy_iface_config_t, get_zcopy_bandwidth),
+     UCS_CONFIG_TYPE_BW},
+
+    {"LAT", "10e-6",
+     "Latency",
+     ucs_offsetof(uct_rocm_copy_iface_config_t, latency),
+     UCS_CONFIG_TYPE_TIME},
+
+    {"SEND_PRE_OVERHEAD", "0",
+     "Send-pre overhead",
+     ucs_offsetof(uct_rocm_copy_iface_config_t, send_pre_overhead),
+     UCS_CONFIG_TYPE_TIME},
+
+    {"SEND_POST_OVERHEAD", "0",
+     "Send-post overhead",
+     ucs_offsetof(uct_rocm_copy_iface_config_t, send_post_overhead),
+     UCS_CONFIG_TYPE_TIME},
+
+    {"RECV_OVERHEAD", "0",
+     "Recv overhead",
+     ucs_offsetof(uct_rocm_copy_iface_config_t, recv_overhead),
+     UCS_CONFIG_TYPE_TIME},
+
     {NULL}
 };
 
@@ -105,9 +155,9 @@ static ucs_status_t uct_rocm_copy_iface_query(uct_iface_h tl_iface,
     iface_attr->cap.am.max_hdr          = 0;
     iface_attr->cap.am.max_iov          = 1;
 
-    iface_attr->latency                 = ucs_linear_func_make(10e-6, 0);
-    iface_attr->bandwidth.dedicated     = 6911.0 * UCS_MBYTE;
-    iface_attr->bandwidth.shared        = 0;
+    iface_attr->latency                 = ucs_linear_func_make(iface->config.latency, 0);
+    iface_attr->bandwidth.dedicated     = iface->config.dedicated_bandwidth;
+    iface_attr->bandwidth.shared        = iface->config.bandwidth;
     iface_attr->overhead                = 0;
     iface_attr->priority                = 0;
 
@@ -170,45 +220,48 @@ static uct_iface_ops_t uct_rocm_copy_iface_ops = {
 static ucs_status_t
 uct_rocm_copy_estimate_perf(uct_iface_h tl_iface, uct_perf_attr_t *perf_attr)
 {
+    uct_rocm_copy_iface_t *iface = ucs_derived_of(tl_iface,
+                                                  uct_rocm_copy_iface_t);
+
     if (perf_attr->field_mask & UCT_PERF_ATTR_FIELD_BANDWIDTH) {
-        perf_attr->bandwidth.dedicated = 0;
+        perf_attr->bandwidth.dedicated = iface->config.dedicated_bandwidth;
         if (!(perf_attr->field_mask & UCT_PERF_ATTR_FIELD_OPERATION)) {
-            perf_attr->bandwidth.shared = 0;
+            perf_attr->bandwidth.shared = iface->config.bandwidth;
         } else {
             switch (perf_attr->operation) {
             case UCT_EP_OP_GET_SHORT:
-                perf_attr->bandwidth.shared = 2000.0 * UCS_MBYTE;
+	      perf_attr->bandwidth.shared = iface->config.get_short_bandwidth < 1 ? iface->config.bandwidth : iface->config.get_short_bandwidth;
                 break;
             case UCT_EP_OP_GET_ZCOPY:
-                perf_attr->bandwidth.shared = 8000.0 * UCS_MBYTE;
+                perf_attr->bandwidth.shared = iface->config.get_zcopy_bandwidth < 1 ? iface->config.bandwidth : iface->config.get_zcopy_bandwidth;
                 break;
             case UCT_EP_OP_PUT_SHORT:
-                perf_attr->bandwidth.shared = 10500.0 * UCS_MBYTE;
+                perf_attr->bandwidth.shared = iface->config.put_short_bandwidth < 1 ? iface->config.bandwidth : iface->config.put_short_bandwidth;
                 break;
             case UCT_EP_OP_PUT_ZCOPY:
-                perf_attr->bandwidth.shared = 9500.0 * UCS_MBYTE;
+                perf_attr->bandwidth.shared = iface->config.put_zcopy_bandwidth < 1 ? iface->config.bandwidth : iface->config.put_zcopy_bandwidth;
                 break;
             default:
-                perf_attr->bandwidth.shared = 0;
+                perf_attr->bandwidth.shared = iface->config.bandwidth;
                 break;
             }
         }
     }
 
     if (perf_attr->field_mask & UCT_PERF_ATTR_FIELD_SEND_PRE_OVERHEAD) {
-        perf_attr->send_pre_overhead = 0;
+        perf_attr->send_pre_overhead = iface->config.send_pre_overhead;
     }
 
     if (perf_attr->field_mask & UCT_PERF_ATTR_FIELD_SEND_POST_OVERHEAD) {
-        perf_attr->send_post_overhead = 0;
+        perf_attr->send_post_overhead = iface->config.send_post_overhead;
     }
 
     if (perf_attr->field_mask & UCT_PERF_ATTR_FIELD_RECV_OVERHEAD) {
-        perf_attr->recv_overhead = 0;
+        perf_attr->recv_overhead = iface->config.recv_overhead;
     }
 
     if (perf_attr->field_mask & UCT_PERF_ATTR_FIELD_LATENCY) {
-        perf_attr->latency = ucs_linear_func_make(10e-6, 0);
+        perf_attr->latency = ucs_linear_func_make(iface->config.latency, 0);
     }
 
     if (perf_attr->field_mask & UCT_PERF_ATTR_FIELD_MAX_INFLIGHT_EPS) {
@@ -248,6 +301,16 @@ static UCS_CLASS_INIT_FUNC(uct_rocm_copy_iface_t, uct_md_h md, uct_worker_h work
     self->config.d2h_thresh         = config->d2h_thresh;
     self->config.h2d_thresh         = config->h2d_thresh;
     self->config.enable_async_zcopy = config->enable_async_zcopy;
+    self->config.latency            = config->latency;
+    self->config.bandwidth          = config->bandwidth;
+    self->config.dedicated_bandwidth = config->bandwidth;
+    self->config.put_short_bandwidth = config->put_short_bandwidth;
+    self->config.get_short_bandwidth = config->get_short_bandwidth;
+    self->config.put_zcopy_bandwidth = config->put_zcopy_bandwidth;
+    self->config.get_zcopy_bandwidth = config->get_zcopy_bandwidth;
+    self->config.send_pre_overhead   = config->send_pre_overhead;
+    self->config.send_post_overhead  = config->send_post_overhead;
+    self->config.recv_overhead       = config->recv_overhead;
 
     ucs_mpool_params_reset(&mp_params);
     mp_params.elem_size       = sizeof(uct_rocm_base_signal_desc_t);

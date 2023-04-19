@@ -25,6 +25,16 @@ typedef struct uct_rocm_copy_iface {
         size_t                  d2h_thresh;
         size_t                  h2d_thresh;
         int                     enable_async_zcopy;
+        double                  bandwidth;
+        double                  dedicated_bandwidth;
+        double                  put_short_bandwidth;
+        double                  get_short_bandwidth;
+        double                  put_zcopy_bandwidth;
+        double                  get_zcopy_bandwidth;
+        double                  latency;
+        double                  send_pre_overhead;
+        double                  send_post_overhead;
+        double                  recv_overhead;
     } config;
 } uct_rocm_copy_iface_t;
 
@@ -33,6 +43,16 @@ typedef struct uct_rocm_copy_iface_config {
     size_t              d2h_thresh;
     size_t              h2d_thresh;
     int                 enable_async_zcopy;
+    double              bandwidth;
+    double              dedicated_bandwidth;
+    double              put_short_bandwidth;
+    double              get_short_bandwidth;
+    double              put_zcopy_bandwidth;
+    double              get_zcopy_bandwidth;
+    double              latency;
+    double              send_pre_overhead;
+    double              send_post_overhead;
+    double              recv_overhead;
 } uct_rocm_copy_iface_config_t;
 
 #endif
