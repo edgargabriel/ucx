@@ -98,6 +98,7 @@ AS_IF([test "x$with_rocm" != "xno"],
            AC_SUBST([ROCM_ROOT])],
           [AC_MSG_WARN([ROCm not found])])
    AC_CHECK_FUNCS([hsa_amd_portable_export_dmabuf])
+   AC_CHECK_FUNCS([hsa_amd_memory_async_copy_on_engine])
 
     CPPFLAGS="$SAVE_CPPFLAGS"
     LDFLAGS="$SAVE_LDFLAGS"

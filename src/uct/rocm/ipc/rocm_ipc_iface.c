@@ -21,6 +21,20 @@ static ucs_config_field_t uct_rocm_ipc_iface_config_table[] = {
      ucs_offsetof(uct_rocm_ipc_iface_config_t, super),
      UCS_CONFIG_TYPE_TABLE(uct_iface_config_table)},
 
+    {"MULTI_SDMA", "no",
+     "Enable using multiple SDMA engines for a transfer",
+     ucs_offsetof(uct_rocm_ipc_iface_config_t, enable_multi_sdma),
+     UCS_CONFIG_TYPE_TERNARY},
+
+    {"MULTI_SDMA_THRESH", "128k",
+     "Minimum data size enforced per SDMA engine before using another engine",
+     ucs_offsetof(uct_rocm_ipc_iface_config_t, multi_sdma_thresh),
+     UCS_CONFIG_TYPE_MEMUNITS},
+
+    {"MAX_SDMA_ENGINES", "2",
+     "Max number of SDMA engines to use for a data transfer",
+     ucs_offsetof(uct_rocm_ipc_iface_config_t, max_sdma_engines), UCS_CONFIG_TYPE_UINT},
+
     {NULL}
 };
 
@@ -166,12 +180,26 @@ static uct_iface_ops_t uct_rocm_ipc_iface_ops = {
 };
 
 
+
+static int uct_rocm_ipc_check_copy_on_engine()
+{
+  int have_copy_on_engine = 0;
+
+#if HAVE_HSA_AMD_MEMORY_ASYNC_COPY_ON_ENGINE
+  have_copy_on_engine = 1;
+#endif
+
+  return have_copy_on_engine;
+}
+
 static UCS_CLASS_INIT_FUNC(uct_rocm_ipc_iface_t, uct_md_h md, uct_worker_h worker,
                            const uct_iface_params_t *params,
                            const uct_iface_config_t *tl_config)
 {
     ucs_status_t status;
     ucs_mpool_params_t mp_params;
+    uct_rocm_ipc_iface_config_t *config = ucs_derived_of(tl_config,
+                                                         uct_rocm_ipc_iface_config_t);
 
     UCS_CLASS_CALL_SUPER_INIT(uct_base_iface_t, &uct_rocm_ipc_iface_ops, 
                               &uct_rocm_ipc_iface_internal_ops,
@@ -193,9 +221,13 @@ static UCS_CLASS_INIT_FUNC(uct_rocm_ipc_iface_t, uct_md_h md, uct_worker_h worke
 
     ucs_queue_head_init(&self->signal_queue);
 
+    self->config.enable_multi_sdma = config->enable_multi_sdma;
+    self->config.multi_sdma_thresh = config->multi_sdma_thresh;
+    self->config.max_sdma_engines  = config->max_sdma_engines;
+    self->config.copy_on_engine    = uct_rocm_ipc_check_copy_on_engine();
+
     return UCS_OK;
 }
-
 
 static UCS_CLASS_CLEANUP_FUNC(uct_rocm_ipc_iface_t)
 {
