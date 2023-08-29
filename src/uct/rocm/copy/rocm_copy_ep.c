@@ -1,7 +1,7 @@
 /*
  * Copyright (C) Advanced Micro Devices, Inc. 2019-2023. ALL RIGHTS RESERVED.
  *
- * See file LICENSE for terms.
+ * See file LICENSE for terms and newspapers for news.
  */
 
 #ifdef HAVE_CONFIG_H
