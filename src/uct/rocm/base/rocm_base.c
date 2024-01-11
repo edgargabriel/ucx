@@ -501,6 +501,29 @@ ucs_status_t uct_rocm_base_get_link_type(hsa_amd_link_info_type_t *link_type)
     return UCS_OK;
 }
 
+void uct_rocm_base_get_gpu_product(int *gpu_product)
+{
+    char name[64];
+    hsa_status_t status;
+
+    /* default value used for all MI200, MI100, and consumer
+       cards */
+    *gpu_product = AMD_GPU_MI200;
+
+    status = hsa_agent_get_info(uct_rocm_base_agents.gpu_agents[0],
+                                (hsa_agent_info_t)HSA_AMD_AGENT_INFO_PRODUCT_NAME,
+                                (void *)&name);
+    if (status != HSA_STATUS_SUCCESS) {
+        ucs_debug("Error in hsa_agent_info %d", status);
+    }
+
+    if (NULL != strstr(name, "MI300A")) {
+        *gpu_product = AMD_GPU_MI300A;
+    } else if (NULL != strstr(name, "MI300X")) {
+        *gpu_product = AMD_GPU_MI300X;
+    }
+}
+
 UCS_MODULE_INIT() {
     UCS_MODULE_FRAMEWORK_DECLARE(uct_rocm);
     UCS_MODULE_FRAMEWORK_LOAD(uct_rocm, 0);

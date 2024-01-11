@@ -13,6 +13,10 @@
 #include <hsa.h>
 #include <hsa_ext_amd.h>
 
+/* First one is used as the default value */
+#define AMD_GPU_MI200  UCS_BIT(1)
+#define AMD_GPU_MI300A UCS_BIT(2)
+#define AMD_GPU_MI300X UCS_BIT(3)
 
 hsa_status_t uct_rocm_base_init(void);
 ucs_status_t uct_rocm_base_query_md_resources(uct_component_h component,
@@ -38,6 +42,7 @@ ucs_status_t uct_rocm_base_mem_query(uct_md_h md, const void *addr,
                                      const size_t length,
                                      uct_md_mem_attr_t *mem_attr_p);
 ucs_status_t uct_rocm_base_get_link_type(hsa_amd_link_info_type_t *type);
+void uct_rocm_base_get_gpu_product(int *gpu_product);
 int uct_rocm_base_is_dmabuf_supported();
 
 #endif
