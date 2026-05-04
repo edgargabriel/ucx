@@ -34,6 +34,7 @@ typedef struct uct_rocm_copy_md_config {
     ucs_linear_func_t           uc_reg_cost;  /**< Memory registration cost estimation
                                                    without using the cache */
     ucs_ternary_auto_value_t    enable_dmabuf; /**< Turn using dmabuf on/off */
+    ucs_ternary_auto_value_t    bypass_dmabuf_kernel_check; /**< Bypass the dmabuf kernel feature check on/off */
 } uct_rocm_copy_md_config_t;
 
 

@@ -36,9 +36,14 @@ static ucs_config_field_t uct_rocm_copy_md_config_table[] = {
      ucs_offsetof(uct_rocm_copy_md_config_t, rcache),
      UCS_CONFIG_TYPE_TABLE(ucs_config_rcache_table)},
 
-    {"DMABUF", "no",
+    {"DMABUF", "yes",
      "Enable using cross-device dmabuf file descriptor",
      ucs_offsetof(uct_rocm_copy_md_config_t, enable_dmabuf),
+     UCS_CONFIG_TYPE_TERNARY},
+
+    {"DMABUF_CHECK_BYPASS", "yes",
+     "Bypass the check for kernel-features to enable dmabuf",
+     ucs_offsetof(uct_rocm_copy_md_config_t, bypass_dmabuf_kernel_check),
      UCS_CONFIG_TYPE_TERNARY},
 
     {NULL}
@@ -420,7 +425,7 @@ uct_rocm_copy_md_open(uct_component_h component, const char *md_name,
     md->reg_cost        = UCS_LINEAR_FUNC_ZERO;
     md->have_dmabuf     = 0;
 
-    have_dmabuf = uct_rocm_base_is_dmabuf_supported();
+    have_dmabuf = md_config->bypass_dmabuf_kernel_check ? UCS_YES : uct_rocm_base_is_dmabuf_supported();
     if ((md_config->enable_dmabuf == UCS_YES) && !have_dmabuf) {
         ucs_error("ROCm dmabuf support requested but not found");
         return UCS_ERR_UNSUPPORTED;
