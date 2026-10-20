@@ -23,11 +23,13 @@ nobase_dist_libuct_rocm_la_HEADERS = \
 
 noinst_HEADERS = \
 	base/rocm_base.h \
-	base/rocm_signal.h
+	base/rocm_signal.h \
+	base/rocm_base_cache.h
 
 libuct_rocm_la_SOURCES = \
 	base/rocm_base.c \
-	base/rocm_signal.c
+	base/rocm_signal.c \
+	base/rocm_base_cache.c
 
 noinst_HEADERS += \
     copy/rocm_copy_md.h \
@@ -52,6 +54,20 @@ libuct_rocm_la_SOURCES += \
     ipc/rocm_ipc_iface.c \
     ipc/rocm_ipc_ep.c \
     ipc/rocm_ipc_cache.c
+
+if HAVE_HSA_AMD_VMEM_FABRIC
+noinst_HEADERS += \
+    fabric/rocm_fabric_md.h \
+    fabric/rocm_fabric_iface.h \
+    fabric/rocm_fabric_ep.h \
+    fabric/rocm_fabric_cache.h
+
+libuct_rocm_la_SOURCES += \
+    fabric/rocm_fabric_md.c \
+    fabric/rocm_fabric_iface.c \
+    fabric/rocm_fabric_ep.c \
+    fabric/rocm_fabric_cache.c
+endif
 
 PKG_CONFIG_NAME=rocm
 

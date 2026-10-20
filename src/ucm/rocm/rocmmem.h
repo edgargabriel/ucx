@@ -25,4 +25,24 @@ hsa_status_t ucm_override_hsa_amd_memory_pool_free(void* ptr);
 hsa_status_t ucm_orig_hsa_amd_memory_pool_free(void* ptr);
 hsa_status_t ucm_hsa_amd_memory_pool_free(void* ptr);
 
+#ifdef HAVE_HSA_AMD_VMEM_FABRIC
+
+/* hsa_amd_vmem_map — VMM virtual address mapping (fabric/RDMA path) */
+hsa_status_t ucm_override_hsa_amd_vmem_map(void* va, size_t size,
+    size_t in_offset, hsa_amd_vmem_alloc_handle_t memory_handle,
+    uint64_t flags);
+hsa_status_t ucm_orig_hsa_amd_vmem_map(void* va, size_t size,
+    size_t in_offset, hsa_amd_vmem_alloc_handle_t memory_handle,
+    uint64_t flags);
+hsa_status_t ucm_hsa_amd_vmem_map(void* va, size_t size,
+    size_t in_offset, hsa_amd_vmem_alloc_handle_t memory_handle,
+    uint64_t flags);
+
+/* hsa_amd_vmem_unmap */
+hsa_status_t ucm_override_hsa_amd_vmem_unmap(void* va, size_t size);
+hsa_status_t ucm_orig_hsa_amd_vmem_unmap(void* va, size_t size);
+hsa_status_t ucm_hsa_amd_vmem_unmap(void* va, size_t size);
+
+#endif /* HAVE_HSA_AMD_VMEM_FABRIC */
+
 #endif

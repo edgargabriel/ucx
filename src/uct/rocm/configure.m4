@@ -11,3 +11,4 @@ uct_rocm_modules=""
 AC_DEFINE_UNQUOTED([uct_rocm_MODULES], ["${uct_rocm_modules}"], [ROCM loadable modules])
 AC_CONFIG_FILES([src/uct/rocm/Makefile
                  src/uct/rocm/ucx-rocm.pc])
+

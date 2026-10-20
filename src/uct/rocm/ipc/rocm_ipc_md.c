@@ -75,6 +75,12 @@ static hsa_status_t uct_rocm_ipc_pack_key(void *address, size_t length,
         return status;
     }
 
+    if (mem_type == HSA_EXT_POINTER_TYPE_HSA_VMEM) {
+        ucs_error("rocm_ipc does not support VMM-allocated memory (%p);"
+                  " use the rocm_fabr transport instead", address);
+        return HSA_STATUS_ERROR_INVALID_ARGUMENT;
+    }
+
     status = hsa_amd_ipc_memory_create(base_ptr, size, &key->ipc);
     if (status != HSA_STATUS_SUCCESS) {
         ucs_error("Failed to create ipc for %p/%lx", address, length);

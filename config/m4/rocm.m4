@@ -115,6 +115,23 @@ AS_IF([test "x$with_rocm" != "xno"],
 
    AC_CHECK_FUNCS([hsa_amd_portable_export_dmabuf])
 
+    # HSA VMM fabric handle API (requires ROCm with hsa_amd_vmem_export_fabric_handle)
+    AS_IF([test "x$rocm_happy" = xyes],
+          [AC_CHECK_LIB([hsa-runtime64], [hsa_amd_vmem_export_fabric_handle],
+               [AC_DEFINE([HAVE_HSA_AMD_VMEM_FABRIC], [1],
+                          [HSA VMM fabric handle API available])
+                have_hsa_vmem_fabric=yes],
+               [have_hsa_vmem_fabric=no])])
+
+    # AMD SMI fabric info API — libamd_smi.so and amd_smi/amdsmi.h are part
+    # of the standard ROCm install; link directly when available.
+    AS_IF([test "x$rocm_happy" = xyes],
+          [AC_CHECK_LIB([amd_smi], [amdsmi_get_gpu_fabric_info],
+               [AC_DEFINE([HAVE_AMDSMI_GPU_FABRIC_INFO], [1],
+                          [AMD SMI fabric info API available])
+                ROCM_LIBS="$ROCM_LIBS -lamd_smi"],
+               [true])])
+
     CPPFLAGS="$SAVE_CPPFLAGS"
     LDFLAGS="$SAVE_LDFLAGS"
     LIBS="$SAVE_LIBS"
@@ -152,6 +169,8 @@ AS_IF([test "x$with_rocm" != "xno"],
 rocm_checked=yes
 AM_CONDITIONAL([HAVE_ROCM], [test "x$rocm_happy" != xno])
 AM_CONDITIONAL([HAVE_HIP], [test "x$hip_happy" != xno])
+AM_CONDITIONAL([HAVE_HSA_AMD_VMEM_FABRIC],
+               [test "x$have_hsa_vmem_fabric" = "xyes"])
 
 ])
 

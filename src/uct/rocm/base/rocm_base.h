@@ -11,6 +11,7 @@
 #include <uct/base/uct_md.h>
 #include <hsa.h>
 #include <hsa_ext_amd.h>
+#include <uct/rocm/base/rocm_signal.h>
 
 /* First one is used as the default value */
 typedef enum uct_rocm_amd_gpu_product {
@@ -49,5 +50,19 @@ int uct_rocm_base_is_dmabuf_supported();
 ucs_status_t uct_rocm_base_ep_flush(uct_ep_h tl_ep, ucs_mpool_t *signal_pool,
                                     ucs_queue_head_t *signal_queue,
                                     uct_completion_t *comp);
+
+/*
+ * Issue an async DMA copy between two ROCm agents using the signal pool.
+ * @a unmap_fn is stored on the signal descriptor and called after completion
+ * to release the remote mapping (NULL → hsa_amd_ipc_memory_detach default).
+ */
+ucs_status_t uct_rocm_base_async_copy(void *dst, hsa_agent_t dst_agent,
+                                      void *src, hsa_agent_t src_agent,
+                                      size_t size,
+                                      void *mapped_addr, size_t mapped_size,
+                                      uct_rocm_unmap_fn_t unmap_fn,
+                                      ucs_mpool_t *signal_pool,
+                                      ucs_queue_head_t *signal_queue,
+                                      uct_completion_t *comp);
 
 #endif

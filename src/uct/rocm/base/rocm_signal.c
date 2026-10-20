@@ -15,6 +15,7 @@ static void uct_rocm_base_signal_desc_init(ucs_mpool_t *mp, void *obj, void *chu
     hsa_status_t status;
 
     memset(base, 0, sizeof(*base));
+    base->unmap_fn = NULL;
     status = hsa_signal_create(1, 0, NULL, &base->signal);
     if (status != HSA_STATUS_SUCCESS) {
         ucs_fatal("fail to create signal");
@@ -66,9 +67,13 @@ unsigned uct_rocm_base_progress(ucs_queue_head_t *signal_queue)
         }
 
         if (rocm_signal->mapped_addr != NULL) {
-            status = hsa_amd_ipc_memory_detach(rocm_signal->mapped_addr);
-            if (status != HSA_STATUS_SUCCESS) {
-                ucs_warn("failed to detach ipc memory region");
+            if (rocm_signal->unmap_fn != NULL) {
+                rocm_signal->unmap_fn(rocm_signal);
+            } else {
+                status = hsa_amd_ipc_memory_detach(rocm_signal->mapped_addr);
+                if (status != HSA_STATUS_SUCCESS) {
+                    ucs_warn("failed to detach ipc memory region");
+                }
             }
             rocm_signal->mapped_addr = NULL;
         }

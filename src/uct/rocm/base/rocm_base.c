@@ -291,7 +291,8 @@ ucs_status_t uct_rocm_base_detect_memory_type(uct_md_h md, const void *addr,
     status = uct_rocm_base_get_ptr_info((void *)addr, length, NULL, NULL,
                                         &hsa_mem_type, &agent, &dev_type);
     if ((status == HSA_STATUS_SUCCESS) &&
-        (hsa_mem_type == HSA_EXT_POINTER_TYPE_HSA) &&
+        ((hsa_mem_type == HSA_EXT_POINTER_TYPE_HSA) ||
+         (hsa_mem_type == HSA_EXT_POINTER_TYPE_HSA_VMEM)) &&
         (dev_type == HSA_DEVICE_TYPE_GPU)) {
         uct_rocm_base_last_device_agent_used = uct_rocm_base_get_dev_num(agent);
         *mem_type_p = UCS_MEMORY_TYPE_ROCM;
@@ -410,7 +411,7 @@ int uct_rocm_base_is_dmabuf_supported()
 }
 
 static void uct_rocm_base_dmabuf_export(const void *addr, const size_t length,
-                                        ucs_memory_type_t mem_type,
+                                        hsa_amd_pointer_type_t hsa_mem_type,
                                         int *dmabuf_fd, size_t *dmabuf_offset)
 {
     int fd          = UCT_DMABUF_FD_INVALID;
@@ -418,17 +419,42 @@ static void uct_rocm_base_dmabuf_export(const void *addr, const size_t length,
 #if HAVE_HSA_AMD_PORTABLE_EXPORT_DMABUF
     hsa_status_t status;
 
-    if (mem_type == UCS_MEMORY_TYPE_ROCM) {
+    if (hsa_mem_type == HSA_EXT_POINTER_TYPE_HSA) {
+        /* Pool-allocated memory: use the portable dmabuf export API */
         status = hsa_amd_portable_export_dmabuf(addr, length, &fd, &offset);
         if (status != HSA_STATUS_SUCCESS) {
             fd     = UCT_DMABUF_FD_INVALID;
             offset = 0;
             ucs_debug("failed to export dmabuf handle for addr %p / %zu: 0x%x",
                       addr, length, status);
+        } else {
+            ucs_trace("dmabuf export addr %p %zu to fd %d offset %zu",
+                      addr, length, fd, (size_t)offset);
         }
+    } else if (hsa_mem_type == HSA_EXT_POINTER_TYPE_HSA_VMEM) {
+        /* VMM-allocated memory: use the VMM shareable handle path */
+#if HAVE_HSA_AMD_VMEM_FABRIC
+        hsa_amd_vmem_alloc_handle_t vmem_handle;
 
-        ucs_trace("dmabuf export addr %p %lu to dmabuf fd %d offset %zu\n",
-                  addr, length, fd, offset);
+        status = hsa_amd_vmem_retain_alloc_handle(&vmem_handle, (void *)addr);
+        if (status != HSA_STATUS_SUCCESS) {
+            ucs_debug("hsa_amd_vmem_retain_alloc_handle(%p) failed: 0x%x",
+                      addr, status);
+        } else {
+            status = hsa_amd_vmem_export_shareable_handle(&fd, vmem_handle, 0);
+            hsa_amd_vmem_handle_release(vmem_handle);
+            if (status != HSA_STATUS_SUCCESS) {
+                fd = UCT_DMABUF_FD_INVALID;
+                ucs_debug("hsa_amd_vmem_export_shareable_handle(%p) failed: 0x%x",
+                          addr, status);
+            } else {
+                /* VMM dmabuf has no sub-allocation offset */
+                offset = 0;
+                ucs_trace("vmem dmabuf export addr %p %zu to fd %d",
+                          addr, length, fd);
+            }
+        }
+#endif
     }
 #endif
     *dmabuf_fd     = fd;
@@ -458,7 +484,8 @@ ucs_status_t uct_rocm_base_mem_query(uct_md_h md, const void *addr,
         return UCS_ERR_INVALID_ADDR;
     }
 
-    if ((hsa_mem_type == HSA_EXT_POINTER_TYPE_HSA) &&
+    if (((hsa_mem_type == HSA_EXT_POINTER_TYPE_HSA) ||
+         (hsa_mem_type == HSA_EXT_POINTER_TYPE_HSA_VMEM)) &&
         (dev_type == HSA_DEVICE_TYPE_GPU)) {
         mem_type = UCS_MEMORY_TYPE_ROCM;
         uct_rocm_base_last_device_agent_used = uct_rocm_base_get_dev_num(agent);
@@ -490,7 +517,7 @@ ucs_status_t uct_rocm_base_mem_query(uct_md_h md, const void *addr,
     if ((mem_attr_p->field_mask & UCT_MD_MEM_ATTR_V2_FIELD_DMABUF_FD) ||
         (mem_attr_p->field_mask & UCT_MD_MEM_ATTR_V2_FIELD_DMABUF_OFFSET)) {
         if (have_dmabuf) {
-            uct_rocm_base_dmabuf_export(base_addr, base_size, mem_type,
+            uct_rocm_base_dmabuf_export(base_addr, base_size, hsa_mem_type,
                                         &dmabuf_fd, &dmabuf_offset);
         }
 
@@ -652,6 +679,42 @@ ucs_status_t uct_rocm_base_ep_flush(uct_ep_h tl_ep, ucs_mpool_t *signal_pool,
     ucs_queue_push(signal_queue, &flush_signal->queue);
 
     UCT_TL_EP_STAT_FLUSH_WAIT(ucs_derived_of(tl_ep, uct_base_ep_t));
+    return UCS_INPROGRESS;
+}
+
+ucs_status_t uct_rocm_base_async_copy(void *dst, hsa_agent_t dst_agent,
+                                      void *src, hsa_agent_t src_agent,
+                                      size_t size,
+                                      void *mapped_addr, size_t mapped_size,
+                                      uct_rocm_unmap_fn_t unmap_fn,
+                                      ucs_mpool_t *signal_pool,
+                                      ucs_queue_head_t *signal_queue,
+                                      uct_completion_t *comp)
+{
+    uct_rocm_base_signal_desc_t *sig;
+    hsa_status_t status;
+
+    sig = ucs_mpool_get(signal_pool);
+    if (ucs_unlikely(sig == NULL)) {
+        ucs_error("rocm signal pool exhausted; increase UCX_ROCM_*_SIGPOOL_MAX_ELEMS");
+        return UCS_ERR_IO_ERROR;
+    }
+
+    hsa_signal_store_screlease(sig->signal, 1);
+    sig->comp        = comp;
+    sig->mapped_addr = mapped_addr;
+    sig->mapped_size = mapped_size;
+    sig->unmap_fn    = unmap_fn;
+
+    status = hsa_amd_memory_async_copy(dst, dst_agent, src, src_agent,
+                                       size, 0, NULL, sig->signal);
+    if (ucs_unlikely(status != HSA_STATUS_SUCCESS)) {
+        ucs_error("hsa_amd_memory_async_copy failed: %d", status);
+        ucs_mpool_put(sig);
+        return UCS_ERR_IO_ERROR;
+    }
+
+    ucs_queue_push(signal_queue, &sig->queue);
     return UCS_INPROGRESS;
 }
 
