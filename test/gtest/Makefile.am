@@ -322,6 +322,7 @@ gtest_SOURCES += \
 	ucm/rocm_hooks.cc \
 	uct/rocm/test_kernels_uct.hip \
 	uct/rocm/test_rocm_ipc_device.hip \
+	uct/rocm/test_rocm_fabric.hip \
 	uct/rocm/test_rocm_signal.cc
 
 gtest_CPPFLAGS += \
