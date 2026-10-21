@@ -32,9 +32,9 @@ static ucs_status_t uct_rocm_fabric_md_query(uct_md_h md,
                                 UCT_MD_FLAG_INVALIDATE |
                                 UCT_MD_FLAG_INVALIDATE_RMA |
                                 UCT_MD_FLAG_INVALIDATE_AMO;
-    md_attr->reg_mem_types    = UCS_BIT(UCS_MEMORY_TYPE_ROCM);
-    md_attr->cache_mem_types  = UCS_BIT(UCS_MEMORY_TYPE_ROCM);
-    md_attr->access_mem_types = UCS_BIT(UCS_MEMORY_TYPE_ROCM);
+    md_attr->reg_mem_types    = UCS_BIT(UCS_MEMORY_TYPE_ROCM_VMM_FABRIC);
+    md_attr->cache_mem_types  = UCS_BIT(UCS_MEMORY_TYPE_ROCM_VMM_FABRIC);
+    md_attr->access_mem_types = UCS_BIT(UCS_MEMORY_TYPE_ROCM_VMM_FABRIC);
     md_attr->reg_cost         = ucs_linear_func_make(9e-9, 0);
     return UCS_OK;
 }
@@ -61,20 +61,13 @@ uct_rocm_fabric_mem_reg(uct_md_h md, void *address, size_t length,
     hsa_status_t status;
     void *base_ptr = NULL;
     size_t base_size = 0;
-    hsa_amd_pointer_type_t mem_type;
+    hsa_amd_pointer_type_t hsa_mem_type;
     hsa_agent_t agent;
 
     status = uct_rocm_base_get_ptr_info(address, length, &base_ptr, &base_size,
-                                        &mem_type, &agent, NULL);
+                                        &hsa_mem_type, &agent, NULL);
     if (status != HSA_STATUS_SUCCESS) {
         ucs_error("failed to get pointer info for %p/%zu", address, length);
-        return UCS_ERR_INVALID_ADDR;
-    }
-
-    if (mem_type != HSA_EXT_POINTER_TYPE_HSA_VMEM) {
-        ucs_error("rocm_fabric requires VMM-allocated memory (HSA_EXT_POINTER_TYPE_HSA_VMEM);"
-                  " got type %d for %p. Use hsa_amd_vmem_handle_create to allocate.",
-                  (int)mem_type, address);
         return UCS_ERR_INVALID_ADDR;
     }
 

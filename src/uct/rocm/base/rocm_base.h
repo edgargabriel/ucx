@@ -38,6 +38,11 @@ hsa_status_t uct_rocm_base_get_ptr_info(void *ptr, size_t size, void **base_ptr,
                                         hsa_agent_t *agent,
                                         hsa_device_type_t *dev_type);
 ucs_status_t uct_rocm_base_get_last_device_pool(hsa_amd_memory_pool_t *pool);
+/*
+ * Probe VMM allocation handle to determine the specific VMM memory type.
+ * Returns ROCM_VMM_FABRIC if the buffer supports fabric export, ROCM otherwise.
+ */
+ucs_memory_type_t uct_rocm_base_detect_vmm_type(const void *addr);
 ucs_status_t uct_rocm_base_detect_memory_type(uct_md_h md, const void *addr,
                                               size_t length,
                                               ucs_memory_type_t *mem_type_p);

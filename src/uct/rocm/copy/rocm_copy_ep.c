@@ -108,10 +108,11 @@ ucs_status_t uct_rocm_copy_ep_zcopy(uct_ep_h tl_ep, uint64_t remote_addr,
         return UCS_ERR_IO_ERROR;
     }
 
-    if (remote_addr_mem_type == HSA_EXT_POINTER_TYPE_HSA) {
+    if ((remote_addr_mem_type == HSA_EXT_POINTER_TYPE_HSA) ||
+        (remote_addr_mem_type == HSA_EXT_POINTER_TYPE_HSA_VMEM)) {
         remote_addr_mod = (void*)remote_addr;
         if (dev_type == HSA_DEVICE_TYPE_GPU) {
-            /* UCS_MEMORY_TYPE_ROCM */
+            /* UCS_MEMORY_TYPE_ROCM or UCS_MEMORY_TYPE_ROCM_VMM_FABRIC */
             agent = tmp_agent;
         } else {
             remote_addr_is_host = 1;
@@ -143,10 +144,11 @@ ucs_status_t uct_rocm_copy_ep_zcopy(uct_ep_h tl_ep, uint64_t remote_addr,
         return UCS_ERR_IO_ERROR;
     }
 
-    if (iov_buffer_mem_type == HSA_EXT_POINTER_TYPE_HSA) {
+    if ((iov_buffer_mem_type == HSA_EXT_POINTER_TYPE_HSA) ||
+        (iov_buffer_mem_type == HSA_EXT_POINTER_TYPE_HSA_VMEM)) {
         iov_buffer_mod = iov->buffer;
         if (dev_type == HSA_DEVICE_TYPE_GPU) {
-            /* UCS_MEMORY_TYPE_ROCM */
+            /* UCS_MEMORY_TYPE_ROCM or UCS_MEMORY_TYPE_ROCM_VMM_FABRIC */
             agent = tmp_agent;
         } else {
             iov_buffer_is_host = 1;
@@ -238,7 +240,9 @@ ucs_status_t uct_rocm_copy_ep_get_zcopy(uct_ep_h tl_ep, const uct_iov_t *iov, si
     uct_rocm_copy_iface_t *iface = ucs_derived_of(tl_ep->iface, uct_rocm_copy_iface_t);
     ucs_status_t status;
 
-    if (size < iface->config.d2h_thresh) {
+    if ((size < iface->config.d2h_thresh) &&
+        ((rkey == UCT_INVALID_RKEY) ||
+         !((uct_rocm_copy_key_t *)rkey)->is_vmm_fabric)) {
         uct_rocm_memcpy_d2h(iov->buffer, (void *)remote_addr, size);
         status = UCS_OK;
     } else {
@@ -261,7 +265,9 @@ ucs_status_t uct_rocm_copy_ep_put_zcopy(uct_ep_h tl_ep, const uct_iov_t *iov, si
     uct_rocm_copy_iface_t *iface = ucs_derived_of(tl_ep->iface, uct_rocm_copy_iface_t);
     ucs_status_t status;
 
-    if (size < iface->config.h2d_thresh) {
+    if ((size < iface->config.h2d_thresh) &&
+        ((rkey == UCT_INVALID_RKEY) ||
+         !((uct_rocm_copy_key_t *)rkey)->is_vmm_fabric)) {
         uct_rocm_memcpy_h2d((void *)remote_addr, iov->buffer, size);
         status = UCS_OK;
     } else {
@@ -285,7 +291,9 @@ ucs_status_t uct_rocm_copy_ep_put_short(uct_ep_h tl_ep, const void *buffer,
     ucs_status_t status          = UCS_OK;
     uct_iov_t *iov;
 
-    if (length <= iface->config.h2d_thresh) {
+    if ((length <= iface->config.h2d_thresh) &&
+        ((rkey == UCT_INVALID_RKEY) ||
+         !((uct_rocm_copy_key_t *)rkey)->is_vmm_fabric)) {
         uct_rocm_memcpy_h2d((void*)remote_addr, buffer, length);
     } else {
         iov = ucs_malloc(sizeof(uct_iov_t), "uct_iov_t");

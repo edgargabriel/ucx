@@ -53,15 +53,20 @@ uct_rocm_copy_md_query(uct_md_h uct_md, uct_md_attr_v2_t *md_attr)
     md_attr->flags            = UCT_MD_FLAG_REG | UCT_MD_FLAG_NEED_RKEY |
                                 UCT_MD_FLAG_ALLOC;
     md_attr->reg_mem_types    = UCS_BIT(UCS_MEMORY_TYPE_HOST) |
-                                UCS_BIT(UCS_MEMORY_TYPE_ROCM);
+                                UCS_BIT(UCS_MEMORY_TYPE_ROCM) |
+                                UCS_BIT(UCS_MEMORY_TYPE_ROCM_VMM_FABRIC);
     md_attr->cache_mem_types  = UCS_BIT(UCS_MEMORY_TYPE_HOST) |
-                                UCS_BIT(UCS_MEMORY_TYPE_ROCM);
+                                UCS_BIT(UCS_MEMORY_TYPE_ROCM) |
+                                UCS_BIT(UCS_MEMORY_TYPE_ROCM_VMM_FABRIC);
     md_attr->alloc_mem_types  = UCS_BIT(UCS_MEMORY_TYPE_ROCM);
     md_attr->access_mem_types = UCS_BIT(UCS_MEMORY_TYPE_HOST) |
-                                UCS_BIT(UCS_MEMORY_TYPE_ROCM);
-    md_attr->detect_mem_types = UCS_BIT(UCS_MEMORY_TYPE_ROCM);
+                                UCS_BIT(UCS_MEMORY_TYPE_ROCM) |
+                                UCS_BIT(UCS_MEMORY_TYPE_ROCM_VMM_FABRIC);
+    md_attr->detect_mem_types = UCS_BIT(UCS_MEMORY_TYPE_ROCM) |
+                                UCS_BIT(UCS_MEMORY_TYPE_ROCM_VMM_FABRIC);
     if (md->have_dmabuf) {
-        md_attr->dmabuf_mem_types |= UCS_BIT(UCS_MEMORY_TYPE_ROCM);
+        md_attr->dmabuf_mem_types |= UCS_BIT(UCS_MEMORY_TYPE_ROCM) |
+                                     UCS_BIT(UCS_MEMORY_TYPE_ROCM_VMM_FABRIC);
     }
     md_attr->max_alloc        = SIZE_MAX;
     md_attr->rkey_packed_size = sizeof(uct_rocm_copy_key_t);
@@ -77,8 +82,18 @@ uct_rocm_copy_mkey_pack(uct_md_h uct_md, uct_mem_h memh, void *address,
     uct_rocm_copy_key_t *packed   = mkey_buffer;
     uct_rocm_copy_mem_t *mem_hndl = memh;
 
-    packed->vaddr   = (uint64_t) mem_hndl->vaddr;
-    packed->dev_ptr = mem_hndl->dev_ptr;
+    /* mem_alloc returns the raw GPU pointer as memh (not a uct_rocm_copy_mem_t).
+     * Detect this by checking if memh == address: in that case the buffer is
+     * pool-allocated GPU memory, never VMM fabric. */
+    if (memh == address) {
+        packed->vaddr         = (uint64_t)address;
+        packed->dev_ptr       = address;
+        packed->is_vmm_fabric = 0;
+    } else {
+        packed->vaddr         = (uint64_t) mem_hndl->vaddr;
+        packed->dev_ptr       = mem_hndl->dev_ptr;
+        packed->is_vmm_fabric = mem_hndl->is_vmm_fabric;
+    }
 
     return UCS_OK;
 }
@@ -97,8 +112,9 @@ uct_rocm_copy_rkey_unpack(uct_component_t *component, const void *rkey_buffer,
         return UCS_ERR_NO_MEMORY;
     }
 
-    key->vaddr   = packed->vaddr;
-    key->dev_ptr = packed->dev_ptr;
+    key->vaddr          = packed->vaddr;
+    key->dev_ptr        = packed->dev_ptr;
+    key->is_vmm_fabric  = packed->is_vmm_fabric;
 
     *handle_p = NULL;
     *rkey_p   = (uintptr_t)key;
@@ -145,10 +161,11 @@ static ucs_status_t uct_rocm_copy_mem_reg_internal(
         return UCS_ERR_IO_ERROR;
     }
 
-    if (mem_type == HSA_EXT_POINTER_TYPE_HSA) {
-        /* This covers device memory and memory allocated
-           with hipHostMalloc */
+    if ((mem_type == HSA_EXT_POINTER_TYPE_HSA) ||
+        (mem_type == HSA_EXT_POINTER_TYPE_HSA_VMEM)) {
+        /* GPU memory — VMM or pool-allocated; not CPU-accessible via memcpy */
         dev_addr = address;
+        mem_hndl->is_vmm_fabric = (mem_type == HSA_EXT_POINTER_TYPE_HSA_VMEM);
     } else {
         if (pg_align_addr) {
             uct_rocm_copy_pg_align_addr(&address, &length);
@@ -158,6 +175,7 @@ static ucs_status_t uct_rocm_copy_mem_reg_internal(
         if ((status != HSA_STATUS_SUCCESS) || (dev_addr == NULL)) {
             return UCS_ERR_IO_ERROR;
         }
+        mem_hndl->is_vmm_fabric = 0;
     }
 
     mem_hndl->vaddr    = address;
